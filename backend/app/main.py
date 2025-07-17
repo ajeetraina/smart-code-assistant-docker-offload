@@ -17,7 +17,7 @@ class ChatResponse(BaseModel):
     response: str
 
 # Initialize FastAPI app
-app = FastAPI(title="Simple Code Assistant with SmolLM2", version="1.0.0")
+app = FastAPI(title="Simple Code Assistant with SmolLM2/Qwen2.5", version="1.0.0")
 
 # Add CORS middleware
 app.add_middleware(
@@ -28,14 +28,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Model configuration - Docker auto-injects these when using models syntax
-LLM_URL = os.getenv("LLM_URL", "http://host.docker.internal:12434/engines/llama.cpp/v1/")
-LLM_MODEL = os.getenv("LLM_MODEL", "ai/smollm2:1.7B-Q8_0")
+# Model configuration - Handle both default and custom environment variables
+# For local: QWEN3_SMALL_URL and QWEN3_SMALL_MODEL (auto-injected)
+# For offload: MODEL_RUNNER_URL and MODEL_RUNNER_MODEL (custom)
+MODEL_URL = (
+    os.getenv("MODEL_RUNNER_URL") or  # Custom offload variable
+    os.getenv("QWEN3_SMALL_URL") or   # Auto-injected small model
+    os.getenv("QWEN3_LARGE_URL") or   # Auto-injected large model
+    "http://host.docker.internal:12434/engines/llama.cpp/v1/"  # Fallback
+)
+
+MODEL_NAME = (
+    os.getenv("MODEL_RUNNER_MODEL") or  # Custom offload variable  
+    os.getenv("QWEN3_SMALL_MODEL") or   # Auto-injected small model
+    os.getenv("QWEN3_LARGE_MODEL") or   # Auto-injected large model
+    "ai/smollm2:1.7B-Q8_0"             # Fallback
+)
+
 API_KEY = os.getenv("API_KEY", "dockermodelrunner")
+
+# Determine model size for UI display
+MODEL_SIZE = "large" if "14B" in MODEL_NAME or "30B" in MODEL_NAME else "small"
+IS_OFFLOAD = os.getenv("MODEL_RUNNER_URL") is not None
 
 @app.get("/")
 async def root():
-    return {"message": "Simple Code Assistant with SmolLM2 is running!", "model": LLM_MODEL}
+    return {
+        "message": "Simple Code Assistant is running!", 
+        "model": MODEL_NAME,
+        "model_size": MODEL_SIZE,
+        "is_offload": IS_OFFLOAD
+    }
 
 @app.get("/health")
 async def health_check():
@@ -43,38 +66,48 @@ async def health_check():
         # Check if model runner is accessible
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{LLM_URL.rstrip('/')}/models",
+                f"{MODEL_URL.rstrip('/')}/models",
                 headers={"Authorization": f"Bearer {API_KEY}"},
                 timeout=5.0
             )
             if response.status_code == 200:
-                return {"status": "healthy", "model_runner": "connected", "model": LLM_MODEL}
+                return {
+                    "status": "healthy", 
+                    "model_runner": "connected", 
+                    "model": MODEL_NAME,
+                    "model_size": MODEL_SIZE,
+                    "is_offload": IS_OFFLOAD,
+                    "endpoint": MODEL_URL
+                }
             else:
                 return {"status": "degraded", "model_runner": "disconnected"}
     except Exception as e:
         return {"status": "unhealthy", "error": str(e)}
 
 async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
-    """Stream response from SmolLM2 via Docker Model Runner"""
+    """Stream response from SmolLM2 or Qwen2.5 via Docker Model Runner"""
     try:
+        # Adjust max_tokens based on model size
+        max_tokens = 2000 if MODEL_SIZE == "large" else 1000
+        
         payload = {
-            "model": LLM_MODEL,
+            "model": MODEL_NAME,
             "messages": [
                 {
                     "role": "system", 
-                    "content": "You are a helpful coding assistant. Provide clear, concise answers to programming questions."
+                    "content": f"You are a helpful coding assistant running on {'Docker Offload' if IS_OFFLOAD else 'local Mac GPU'}. Provide clear, concise answers to programming questions."
                 },
                 {"role": "user", "content": message}
             ],
             "stream": True,
-            "max_tokens": 1000,
+            "max_tokens": max_tokens,
             "temperature": 0.7
         }
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for large models
             async with client.stream(
                 "POST",
-                f"{LLM_URL}chat/completions",
+                f"{MODEL_URL}chat/completions",
                 headers={
                     "Authorization": f"Bearer {API_KEY}",
                     "Content-Type": "application/json"
@@ -106,7 +139,7 @@ async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
 @app.post("/api/chat")
 async def chat_stream(request: ChatRequest):
     """
-    Stream chat response from SmolLM2 model
+    Stream chat response from SmolLM2 or Qwen2.5 model
     """
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
@@ -125,23 +158,25 @@ async def chat_stream(request: ChatRequest):
     else:
         # Non-streaming response (fallback)
         try:
+            max_tokens = 2000 if MODEL_SIZE == "large" else 1000
+            
             payload = {
-                "model": LLM_MODEL,
+                "model": MODEL_NAME,
                 "messages": [
                     {
                         "role": "system", 
-                        "content": "You are a helpful coding assistant. Provide clear, concise answers to programming questions."
+                        "content": f"You are a helpful coding assistant running on {'Docker Offload' if IS_OFFLOAD else 'local Mac GPU'}. Provide clear, concise answers to programming questions."
                     },
                     {"role": "user", "content": request.message}
                 ],
                 "stream": False,
-                "max_tokens": 1000,
+                "max_tokens": max_tokens,
                 "temperature": 0.7
             }
             
-            async with httpx.AsyncClient(timeout=30.0) as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.post(
-                    f"{LLM_URL}chat/completions",
+                    f"{MODEL_URL}chat/completions",
                     headers={
                         "Authorization": f"Bearer {API_KEY}",
                         "Content-Type": "application/json"
@@ -165,14 +200,17 @@ async def get_model_info():
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{LLM_URL.rstrip('/')}/models",
+                f"{MODEL_URL.rstrip('/')}/models",
                 headers={"Authorization": f"Bearer {API_KEY}"},
                 timeout=5.0
             )
             if response.status_code == 200:
                 models = response.json()
                 return {
-                    "current_model": LLM_MODEL,
+                    "current_model": MODEL_NAME,
+                    "model_size": MODEL_SIZE,
+                    "is_offload": IS_OFFLOAD,
+                    "endpoint": MODEL_URL,
                     "available_models": models.get("data", []),
                     "status": "connected"
                 }
