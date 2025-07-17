@@ -17,7 +17,7 @@ class ChatResponse(BaseModel):
     response: str
 
 # Initialize FastAPI app
-app = FastAPI(title="Simple Code Assistant with SmolLM2/Qwen2.5", version="1.0.0")
+app = FastAPI(title="Smart Code Assistant with Docker Offload", version="1.0.0")
 
 # Add CORS middleware
 app.add_middleware(
@@ -28,36 +28,55 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Model configuration - Handle both default and custom environment variables
-# For local: QWEN3_SMALL_URL and QWEN3_SMALL_MODEL (auto-injected)
-# For offload: MODEL_RUNNER_URL and MODEL_RUNNER_MODEL (custom)
-MODEL_URL = (
-    os.getenv("MODEL_RUNNER_URL") or  # Custom offload variable
-    os.getenv("QWEN3_SMALL_URL") or   # Auto-injected small model
-    os.getenv("QWEN3_LARGE_URL") or   # Auto-injected large model
-    "http://host.docker.internal:12434/engines/llama.cpp/v1/"  # Fallback
-)
-
-MODEL_NAME = (
-    os.getenv("MODEL_RUNNER_MODEL") or  # Custom offload variable  
-    os.getenv("QWEN3_SMALL_MODEL") or   # Auto-injected small model
-    os.getenv("QWEN3_LARGE_MODEL") or   # Auto-injected large model
-    "ai/smollm2:1.7B-Q8_0"             # Fallback
-)
-
+# Model configuration - Docker injects these via long syntax configuration
+MODEL_URL = os.getenv("MODEL_RUNNER_URL", "http://host.docker.internal:12434/engines/llama.cpp/v1/")
+MODEL_NAME = os.getenv("MODEL_RUNNER_MODEL", "ai/smollm2:1.7B-Q8_0")
 API_KEY = os.getenv("API_KEY", "dockermodelrunner")
 
-# Determine model size for UI display
-MODEL_SIZE = "large" if "14B" in MODEL_NAME or "30B" in MODEL_NAME else "small"
-IS_OFFLOAD = os.getenv("MODEL_RUNNER_URL") is not None
+# Determine model characteristics for optimization
+def get_model_info(model_name: str):
+    """Extract model information from name for optimization"""
+    model_name_lower = model_name.lower()
+    
+    if "1.7b" in model_name_lower or "1b" in model_name_lower:
+        return {
+            "size": "small",
+            "max_tokens": 1000,
+            "timeout": 30.0,
+            "model_display": model_name.replace("ai/", "").replace(":1.7B-Q8_0", " 1.7B")
+        }
+    elif "7b" in model_name_lower:
+        return {
+            "size": "medium", 
+            "max_tokens": 1500,
+            "timeout": 45.0,
+            "model_display": model_name.replace("ai/", "").replace(":7B-Q4_0", " 7B")
+        }
+    elif "14b" in model_name_lower or "30b" in model_name_lower:
+        return {
+            "size": "large",
+            "max_tokens": 2000, 
+            "timeout": 60.0,
+            "model_display": model_name.replace("ai/", "").replace(":14B-Q4_K_M", " 14B")
+        }
+    else:
+        return {
+            "size": "unknown",
+            "max_tokens": 1000,
+            "timeout": 30.0,
+            "model_display": model_name.replace("ai/", "")
+        }
+
+MODEL_INFO = get_model_info(MODEL_NAME)
 
 @app.get("/")
 async def root():
     return {
-        "message": "Simple Code Assistant is running!", 
+        "message": "Smart Code Assistant with Docker Offload is running!", 
         "model": MODEL_NAME,
-        "model_size": MODEL_SIZE,
-        "is_offload": IS_OFFLOAD
+        "model_display": MODEL_INFO["model_display"],
+        "model_size": MODEL_INFO["size"],
+        "endpoint": MODEL_URL
     }
 
 @app.get("/health")
@@ -75,8 +94,8 @@ async def health_check():
                     "status": "healthy", 
                     "model_runner": "connected", 
                     "model": MODEL_NAME,
-                    "model_size": MODEL_SIZE,
-                    "is_offload": IS_OFFLOAD,
+                    "model_display": MODEL_INFO["model_display"],
+                    "model_size": MODEL_INFO["size"],
                     "endpoint": MODEL_URL
                 }
             else:
@@ -85,26 +104,23 @@ async def health_check():
         return {"status": "unhealthy", "error": str(e)}
 
 async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
-    """Stream response from SmolLM2 or Qwen2.5 via Docker Model Runner"""
+    """Stream response from the configured model via Docker Model Runner"""
     try:
-        # Adjust max_tokens based on model size
-        max_tokens = 2000 if MODEL_SIZE == "large" else 1000
-        
         payload = {
             "model": MODEL_NAME,
             "messages": [
                 {
                     "role": "system", 
-                    "content": f"You are a helpful coding assistant running on {'Docker Offload' if IS_OFFLOAD else 'local Mac GPU'}. Provide clear, concise answers to programming questions."
+                    "content": f"You are a helpful coding assistant running with {MODEL_INFO['model_display']} model. Provide clear, concise answers to programming questions."
                 },
                 {"role": "user", "content": message}
             ],
             "stream": True,
-            "max_tokens": max_tokens,
+            "max_tokens": MODEL_INFO["max_tokens"],
             "temperature": 0.7
         }
         
-        async with httpx.AsyncClient(timeout=60.0) as client:  # Longer timeout for large models
+        async with httpx.AsyncClient(timeout=MODEL_INFO["timeout"]) as client:
             async with client.stream(
                 "POST",
                 f"{MODEL_URL}chat/completions",
@@ -139,7 +155,7 @@ async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
 @app.post("/api/chat")
 async def chat_stream(request: ChatRequest):
     """
-    Stream chat response from SmolLM2 or Qwen2.5 model
+    Stream chat response from the configured model
     """
     if not request.message.strip():
         raise HTTPException(status_code=400, detail="Message cannot be empty")
@@ -158,23 +174,21 @@ async def chat_stream(request: ChatRequest):
     else:
         # Non-streaming response (fallback)
         try:
-            max_tokens = 2000 if MODEL_SIZE == "large" else 1000
-            
             payload = {
                 "model": MODEL_NAME,
                 "messages": [
                     {
                         "role": "system", 
-                        "content": f"You are a helpful coding assistant running on {'Docker Offload' if IS_OFFLOAD else 'local Mac GPU'}. Provide clear, concise answers to programming questions."
+                        "content": f"You are a helpful coding assistant running with {MODEL_INFO['model_display']} model. Provide clear, concise answers to programming questions."
                     },
                     {"role": "user", "content": request.message}
                 ],
                 "stream": False,
-                "max_tokens": max_tokens,
+                "max_tokens": MODEL_INFO["max_tokens"],
                 "temperature": 0.7
             }
             
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=MODEL_INFO["timeout"]) as client:
                 response = await client.post(
                     f"{MODEL_URL}chat/completions",
                     headers={
@@ -208,9 +222,10 @@ async def get_model_info():
                 models = response.json()
                 return {
                     "current_model": MODEL_NAME,
-                    "model_size": MODEL_SIZE,
-                    "is_offload": IS_OFFLOAD,
+                    "model_display": MODEL_INFO["model_display"],
+                    "model_size": MODEL_INFO["size"],
                     "endpoint": MODEL_URL,
+                    "max_tokens": MODEL_INFO["max_tokens"],
                     "available_models": models.get("data", []),
                     "status": "connected"
                 }
