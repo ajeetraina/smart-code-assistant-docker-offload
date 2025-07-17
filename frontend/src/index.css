@@ -1,0 +1,85 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom styles */
+.code-editor {
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+.system-status {
+  @apply rounded-lg p-4 mb-6 border;
+}
+
+.status-local {
+  @apply bg-blue-50 border-blue-200;
+}
+
+.status-offload {
+  @apply bg-green-50 border-green-200;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Syntax highlighting adjustments */
+pre[class*="language-"] {
+  @apply rounded-lg border;
+}
+
+code[class*="language-"] {
+  @apply text-sm;
+}
+
+/* Button styles */
+.btn-primary {
+  @apply bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed;
+}
+
+.btn-secondary {
+  @apply bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-md transition-colors;
+}
+
+/* Card styles */
+.card {
+  @apply bg-white rounded-lg shadow-md p-6 border;
+}
+
+/* Code block styles */
+.code-block {
+  @apply bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .container {
+    @apply px-4;
+  }
+  
+  .code-editor {
+    @apply text-sm;
+  }
+}
+
+/* Performance metrics */
+.metric-card {
+  @apply bg-gray-50 rounded-lg p-3 border border-gray-200;
+}
+
+.metric-value {
+  @apply text-lg font-semibold text-gray-900;
+}
+
+.metric-label {
+  @apply text-sm text-gray-600;
+}
