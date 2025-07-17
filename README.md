@@ -1,155 +1,173 @@
-# Smart Code Assistant: Docker Offload Demo
+# Simple SmolLM2 Chatbot with Mac GPU Support
 
-A progressive web application demonstrating the power of **Docker Offload** by showcasing the transition from local small language models to cloud-powered large language models for AI-powered code assistance.
-
-## 🎯 Project Overview
-
-This project illustrates the practical decision-making process for when to use local development vs Docker Offload, specifically for AI/ML workloads:
-
-- **Phase 1**: Local development with small, CPU-efficient models (< 1GB)
-- **Phase 2**: Scale to Docker Offload with large, GPU-accelerated models (> 7GB)
-
-## 🔧 Architecture
-
-### Local Development (Small Model)
-- **Model**: CodeT5-small (220MB)
-- **Hardware**: CPU, 4GB RAM
-- **Use Case**: Basic code completion, syntax help
-- **Response Time**: 1-2 seconds
-
-### Docker Offload (Large Model)  
-- **Model**: CodeLlama-34B (19GB)
-- **Hardware**: NVIDIA L4 GPU, 23GB VRAM
-- **Use Case**: Advanced code generation, explanation, refactoring
-- **Response Time**: 3-5 seconds (includes network)
-
-## 📊 Decision Matrix
-
-### Use Local When:
-- Model size < 7B parameters
-- Development/testing phase
-- Quick iterations and debugging
-- Sufficient local hardware
-- Offline requirements
-
-### Use Docker Offload When:
-- Model size > 13B parameters  
-- Need GPU acceleration (CUDA workloads)
-- Local machine lacks GPU/VRAM
-- Production-scale inference
-- Team has mixed hardware capabilities
+A clean, simple chatbot interface powered by SmolLM2 running locally on your Mac with GPU acceleration via Docker Model Runner.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- Docker Desktop 4.43.0+
-- Docker Offload enabled (for Phase 2)
 
-### Phase 1: Local Development
+1. **Docker Desktop 4.43+** with Model Runner enabled
+2. **Mac with Apple Silicon** (M1/M2/M3) for optimal GPU performance
+3. **At least 8GB RAM** available
+
+### Step 1: Pull SmolLM2 Model
+
 ```bash
-# Clone the repository
+# Pull the optimized SmolLM2 model for Mac
+docker model pull ai/smollm2:1.7B-Q8_0
+```
+
+### Step 2: Clone and Start
+
+```bash
+# Clone this repository
 git clone https://github.com/ajeetraina/smart-code-assistant-docker-offload.git
 cd smart-code-assistant-docker-offload
 
-# Start with small model locally
-docker-compose -f docker-compose.local.yml up --build
-
-# Visit http://localhost:3000
+# Start the application
+docker-compose up --build
 ```
 
-### Phase 2: Scale to Docker Offload
+### Step 3: Access the Chat
+
+- **Frontend**: http://localhost:3000
+- **Backend API**: http://localhost:8080
+- **Health Check**: http://localhost:8080/health
+
+## 🏗️ Architecture
+
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────────┐
+│  Frontend   │───▶│   Backend   │───▶│ Docker Model    │
+│ (React/TS)  │    │ (FastAPI)   │    │ Runner (SmolLM2)│
+│ Port: 3000  │    │ Port: 8080  │    │ Auto-managed    │
+└─────────────┘    └─────────────┘    └─────────────────┘
+```
+
+## ⚡ What's Different
+
+### ✅ **Added - Simple & Working**
+- **Clean chatbot UI** - Just messages, input, and send button
+- **SmolLM2 integration** - Local Mac GPU acceleration  
+- **Real-time streaming** - Tokens appear as they're generated
+- **Proper Docker Models** - Uses official Compose models syntax
+- **Auto-configuration** - Docker injects model URLs automatically
+
+### ❌ **Removed - Complex Demo Stuff**
+- Performance metrics dashboards
+- Docker Offload comparison charts
+- System information cards  
+- Example prompt sidebars
+- Decision guides about local vs cloud
+- Complex tabs and navigation
+
+## 🔧 Configuration
+
+### Docker Compose Models
+
+The `docker-compose.yml` uses the official Docker Compose models specification:
+
+```yaml
+services:
+  backend:
+    models:
+      - llm
+
+models:
+  llm:
+    model: ai/smollm2:1.7B-Q8_0
+    context_size: 4096
+    runtime_flags:
+      - "--threads=8"
+      - "--ctx-size=4096"
+```
+
+Docker automatically injects these environment variables into the backend:
+- `LLM_URL` - URL to access the model
+- `LLM_MODEL` - Model identifier
+
+### Model Options
+
+Change the model by updating `docker-compose.yml`:
+
+```yaml
+models:
+  llm:
+    model: ai/smollm2:1.7B-Q8_0  # Fast, recommended
+    # model: ai/smollm2:1.7B-Q4_0  # Smaller size
+    # model: ai/llama3.2:1B-Q8_0   # Alternative
+```
+
+## 🎨 Features
+
+- **Clean Interface** - Simple chat with no clutter
+- **Real-time Streaming** - Watch responses generate token by token  
+- **Mac GPU Acceleration** - Optimized for Apple Silicon
+- **Model Status** - Visual connection status indicator
+- **Error Handling** - Graceful fallbacks and clear error messages
+- **Health Monitoring** - `/health` endpoint for service status
+
+## 🚨 Troubleshooting
+
+### Model Not Loading
+
 ```bash
-# Start Docker Offload session with GPU
-docker offload start --gpu
+# Check if model is available
+docker model list
 
-# Deploy large model to cloud
-docker-compose -f docker-compose.local.yml -f docker-compose.offload.yml up --build
+# Re-pull if needed
+docker model pull ai/smollm2:1.7B-Q8_0
 
-# Same interface, now with GPU-accelerated large model
+# Check if Model Runner is working
+docker model info ai/smollm2:1.7B-Q8_0
 ```
 
-## 🏗️ Project Structure
+### Connection Issues
 
-```
-├── frontend/                 # React web application
-│   ├── src/
-│   ├── package.json
-│   └── Dockerfile
-├── backend/                  # FastAPI Python backend
-│   ├── app/
-│   ├── requirements.txt
-│   └── Dockerfile
-├── docker-compose.local.yml  # Local development setup
-├── docker-compose.offload.yml # Docker Offload configuration
-└── README.md
-```
-
-## 📈 Performance Comparison
-
-| Metric | Local (Small) | Docker Offload (Large) |
-|--------|---------------|------------------------|
-| Startup Time | 5 seconds | 30 seconds |
-| Memory Usage | 2GB RAM | 23GB GPU VRAM |
-| Code Quality | Basic completions | Advanced generation |
-| Context Understanding | 512 tokens | 4096+ tokens |
-| Response Accuracy | 70% | 95% |
-
-## 🎮 Demo Scenarios
-
-### Scenario 1: Simple Autocomplete (Local)
-```python
-# User types: "def fibonacci("
-# Local model responds: "n): return n if n <= 1 else fibonacci(n-1) + fibonacci(n-2)"
-```
-
-### Scenario 2: Complex Code Generation (Docker Offload)
-```javascript
-// User asks: "Create a React component with state management for a shopping cart"
-// Large model generates complete component with hooks, context, and TypeScript
-```
-
-## 🔍 System Information
-
-The web interface shows real-time information about:
-- Current model size (small/large)
-- Execution environment (local/docker-offload)
-- GPU availability and usage
-- Response performance metrics
-
-## 🐛 Troubleshooting
-
-### Common Issues:
-1. **Local model fails to start**: Ensure Docker has enough memory allocated (4GB+)
-2. **GPU not detected in Docker Offload**: Verify `docker offload start --gpu` was used
-3. **Slow responses**: Check network connectivity for Docker Offload mode
-
-### Debug Commands:
 ```bash
-# Check Docker Offload status
-docker offload status
+# Check backend health
+curl http://localhost:8080/health
 
-# Verify GPU access
-docker run --rm --gpus all nvidia/cuda:12.4.0-runtime-ubuntu22.04 nvidia-smi
+# Check model info endpoint
+curl http://localhost:8080/api/model-info
 
-# Check system resources
-docker system df
+# Check Docker Compose services
+docker-compose ps
 ```
 
-## 📚 Learn More
+### Performance Issues
 
-- [Docker Offload Documentation](https://docs.docker.com/offload/)
-- [When to Use Docker Offload vs Local Development](./docs/decision-guide.md)
-- [Performance Benchmarks](./docs/benchmarks.md)
+- **Slow responses**: Ensure Mac GPU is being utilized
+- **Memory errors**: Close other applications to free up RAM  
+- **Docker issues**: Restart Docker Desktop
 
-## 🤝 Contributing
+## 📊 Development
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+For development with hot reloading:
+
+```bash
+# Frontend (in frontend/)
+npm install
+npm run dev  # Port 3000
+
+# Backend (in backend/)
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8080
+```
+
+## 🎯 What This Achieves
+
+This transforms the repository from a **complex Docker Offload demonstration** into a **simple, functional chatbot** that:
+
+✅ Actually works with local AI models  
+✅ Uses proper Docker Compose models syntax  
+✅ Provides a clean user experience  
+✅ Runs SmolLM2 with Mac GPU acceleration  
+✅ Streams responses in real-time  
+✅ Has proper error handling  
+
+Perfect for developers who want a clean AI coding assistant without technical complexity!
 
 ## 📄 License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
+MIT License - feel free to modify and distribute!
