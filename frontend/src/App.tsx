@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, User, Cpu, Zap } from 'lucide-react';
+import { Send, Bot, User, Cpu, Zap, Cloud } from 'lucide-react';
 
 interface Message {
   id: string;
@@ -11,6 +11,8 @@ interface Message {
 
 interface ModelInfo {
   current_model: string;
+  model_size: string;
+  is_offload: boolean;
   status: string;
 }
 
@@ -18,7 +20,7 @@ const SimpleChatbot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Hi! I'm your SmolLM2 code assistant running locally on your Mac. Ask me anything about programming!",
+      content: "Hi! I'm your AI coding assistant. I can run locally with SmolLM2 or scale up with larger models via Docker Offload. Ask me anything about programming!",
       role: 'assistant',
       timestamp: new Date()
     }
@@ -100,7 +102,7 @@ const SimpleChatbot: React.FC = () => {
           if (done) break;
 
           const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
+          const lines = chunk.split('\\n');
 
           for (const line of lines) {
             if (line.startsWith('data: ')) {
@@ -156,7 +158,7 @@ const SimpleChatbot: React.FC = () => {
           msg.id === assistantMessage.id 
             ? { 
                 ...msg, 
-                content: "Sorry, I'm having trouble connecting to the model. Please make sure SmolLM2 is running with Docker Model Runner.",
+                content: \"Sorry, I'm having trouble connecting to the model. Please check if the Docker Model Runner is running.\",
                 isStreaming: false 
               }
             : msg
@@ -174,39 +176,54 @@ const SimpleChatbot: React.FC = () => {
     }
   };
 
+  const getModelDisplayName = (modelName: string) => {
+    if (modelName.includes('smollm2')) return 'SmolLM2 1.7B';
+    if (modelName.includes('qwen2.5-coder')) return 'Qwen2.5-Coder 14B';
+    if (modelName.includes('qwen3')) return 'Qwen3 30B';
+    return modelName.replace('ai/', '');
+  };
+
   return (
-    <div className="flex flex-col h-screen max-w-4xl mx-auto bg-white">
+    <div className=\"flex flex-col h-screen max-w-4xl mx-auto bg-white\">
       {/* Header with Model Info */}
-      <div className="border-b border-gray-200 p-4 bg-gradient-to-r from-blue-50 to-indigo-50">
-        <div className="flex items-center justify-between">
-          <h1 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
-            <Bot className="h-6 w-6 text-blue-500" />
-            SmolLM2 Code Assistant
+      <div className=\"border-b border-gray-200 p-4 bg-gradient-to-r from-blue-50 to-indigo-50\">
+        <div className=\"flex items-center justify-between\">
+          <h1 className=\"text-xl font-semibold text-gray-800 flex items-center gap-2\">
+            <Bot className=\"h-6 w-6 text-blue-500\" />
+            AI Code Assistant
           </h1>
           
           {modelInfo && (
-            <div className="flex items-center gap-2 text-sm">
-              <div className="flex items-center gap-1">
-                <Cpu className="h-4 w-4 text-green-500" />
-                <span className="text-gray-600">
-                  {modelInfo.current_model?.replace('ai/', '')}
+            <div className=\"flex items-center gap-3 text-sm\">
+              <div className=\"flex items-center gap-1\">
+                {modelInfo.is_offload ? (
+                  <Cloud className=\"h-4 w-4 text-purple-500\" />
+                ) : (
+                  <Cpu className=\"h-4 w-4 text-green-500\" />
+                )}
+                <span className=\"text-gray-600\">
+                  {getModelDisplayName(modelInfo.current_model)}
                 </span>
               </div>
+              
+              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+                modelInfo.is_offload 
+                  ? 'bg-purple-100 text-purple-700' 
+                  : 'bg-green-100 text-green-700'
+              }`}>
+                {modelInfo.is_offload ? 'Docker Offload' : 'Local GPU'}
+              </div>
+              
               <div className={`w-2 h-2 rounded-full ${
                 modelInfo.status === 'connected' ? 'bg-green-500' : 'bg-red-500'
               }`}></div>
-              <span className={`text-xs ${
-                modelInfo.status === 'connected' ? 'text-green-600' : 'text-red-600'
-              }`}>
-                {modelInfo.status === 'connected' ? 'Local GPU' : 'Disconnected'}
-              </span>
             </div>
           )}
         </div>
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className=\"flex-1 overflow-y-auto p-4 space-y-4\">
         {messages.map((message) => (
           <div
             key={message.id}
@@ -215,8 +232,8 @@ const SimpleChatbot: React.FC = () => {
             }`}
           >
             {message.role === 'assistant' && (
-              <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-                <Bot className="h-4 w-4 text-white" />
+              <div className=\"w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0\">
+                <Bot className=\"h-4 w-4 text-white\" />
               </div>
             )}
             
@@ -227,13 +244,13 @@ const SimpleChatbot: React.FC = () => {
                   : 'bg-gray-100 text-gray-900 rounded-bl-none'
               }`}
             >
-              <p className="text-sm whitespace-pre-wrap">
+              <p className=\"text-sm whitespace-pre-wrap\">
                 {message.content}
                 {message.isStreaming && (
-                  <span className="inline-block w-2 h-4 bg-blue-400 ml-1 animate-pulse"></span>
+                  <span className=\"inline-block w-2 h-4 bg-blue-400 ml-1 animate-pulse\"></span>
                 )}
               </p>
-              <div className="flex items-center justify-between mt-1">
+              <div className=\"flex items-center justify-between mt-1\">
                 <p className={`text-xs ${
                   message.role === 'user' ? 'text-blue-100' : 'text-gray-500'
                 }`}>
@@ -243,29 +260,35 @@ const SimpleChatbot: React.FC = () => {
                   })}
                 </p>
                 {message.role === 'assistant' && !message.isStreaming && (
-                  <Zap className="h-3 w-3 text-green-500" title="Powered by local SmolLM2" />
+                  <div className=\"flex items-center gap-1\">
+                    {modelInfo?.is_offload ? (
+                      <Cloud className=\"h-3 w-3 text-purple-500\" title=\"Powered by Docker Offload\" />
+                    ) : (
+                      <Zap className=\"h-3 w-3 text-green-500\" title=\"Powered by local GPU\" />
+                    )}
+                  </div>
                 )}
               </div>
             </div>
 
             {message.role === 'user' && (
-              <div className="w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center flex-shrink-0">
-                <User className="h-4 w-4 text-white" />
+              <div className=\"w-8 h-8 bg-gray-500 rounded-full flex items-center justify-center flex-shrink-0\">
+                <User className=\"h-4 w-4 text-white\" />
               </div>
             )}
           </div>
         ))}
 
         {isLoading && messages[messages.length - 1]?.role !== 'assistant' && (
-          <div className="flex gap-3 justify-start">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
-              <Bot className="h-4 w-4 text-white" />
+          <div className=\"flex gap-3 justify-start\">
+            <div className=\"w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0\">
+              <Bot className=\"h-4 w-4 text-white\" />
             </div>
-            <div className="bg-gray-100 text-gray-900 px-4 py-2 rounded-lg rounded-bl-none">
-              <div className="flex space-x-1">
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+            <div className=\"bg-gray-100 text-gray-900 px-4 py-2 rounded-lg rounded-bl-none\">
+              <div className=\"flex space-x-1\">
+                <div className=\"w-2 h-2 bg-gray-400 rounded-full animate-bounce\"></div>
+                <div className=\"w-2 h-2 bg-gray-400 rounded-full animate-bounce\" style={{ animationDelay: '0.1s' }}></div>
+                <div className=\"w-2 h-2 bg-gray-400 rounded-full animate-bounce\" style={{ animationDelay: '0.2s' }}></div>
               </div>
             </div>
           </div>
@@ -275,14 +298,14 @@ const SimpleChatbot: React.FC = () => {
       </div>
 
       {/* Input */}
-      <div className="border-t border-gray-200 p-4 bg-gray-50">
-        <div className="flex gap-2">
+      <div className=\"border-t border-gray-200 p-4 bg-gray-50\">
+        <div className=\"flex gap-2\">
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyPress={handleKeyPress}
-            placeholder="Ask me about coding, algorithms, debugging, or any programming question..."
-            className="flex-1 resize-none border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+            placeholder=\"Ask me about coding, algorithms, debugging, or any programming question...\"
+            className=\"flex-1 resize-none border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white\"
             rows={1}
             style={{ minHeight: '40px', maxHeight: '120px' }}
             disabled={isLoading}
@@ -290,18 +313,27 @@ const SimpleChatbot: React.FC = () => {
           <button
             onClick={handleSend}
             disabled={!input.trim() || isLoading}
-            className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className=\"bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors\"
           >
-            <Send className="h-5 w-5" />
+            <Send className=\"h-5 w-5\" />
           </button>
         </div>
-        <div className="flex items-center justify-between mt-2">
-          <p className="text-xs text-gray-500">
+        <div className=\"flex items-center justify-between mt-2\">
+          <p className=\"text-xs text-gray-500\">
             Press Enter to send, Shift+Enter for new line
           </p>
-          <p className="text-xs text-gray-500 flex items-center gap-1">
-            <Cpu className="h-3 w-3" />
-            Running locally with Mac GPU acceleration
+          <p className=\"text-xs text-gray-500 flex items-center gap-1\">
+            {modelInfo?.is_offload ? (
+              <>
+                <Cloud className=\"h-3 w-3\" />
+                Running on Docker Offload with {modelInfo.model_size} model
+              </>
+            ) : (
+              <>
+                <Cpu className=\"h-3 w-3\" />
+                Running locally with Mac GPU acceleration
+              </>
+            )}
           </p>
         </div>
       </div>
