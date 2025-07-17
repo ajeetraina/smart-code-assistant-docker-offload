@@ -28,14 +28,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Model Runner configuration
-MODEL_RUNNER_BASE_URL = os.getenv("BASE_URL", "http://host.docker.internal:12434/engines/llama.cpp/v1/")
-MODEL_NAME = os.getenv("MODEL", "ai/smollm2:1.7B-Q8_0")
+# Model configuration - Docker auto-injects these when using models syntax
+LLM_URL = os.getenv("LLM_URL", "http://host.docker.internal:12434/engines/llama.cpp/v1/")
+LLM_MODEL = os.getenv("LLM_MODEL", "ai/smollm2:1.7B-Q8_0")
 API_KEY = os.getenv("API_KEY", "dockermodelrunner")
 
 @app.get("/")
 async def root():
-    return {"message": "Simple Code Assistant with SmolLM2 is running!", "model": MODEL_NAME}
+    return {"message": "Simple Code Assistant with SmolLM2 is running!", "model": LLM_MODEL}
 
 @app.get("/health")
 async def health_check():
@@ -43,12 +43,12 @@ async def health_check():
         # Check if model runner is accessible
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{MODEL_RUNNER_BASE_URL.rstrip('/')}/models",
+                f"{LLM_URL.rstrip('/')}/models",
                 headers={"Authorization": f"Bearer {API_KEY}"},
                 timeout=5.0
             )
             if response.status_code == 200:
-                return {"status": "healthy", "model_runner": "connected", "model": MODEL_NAME}
+                return {"status": "healthy", "model_runner": "connected", "model": LLM_MODEL}
             else:
                 return {"status": "degraded", "model_runner": "disconnected"}
     except Exception as e:
@@ -58,7 +58,7 @@ async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
     """Stream response from SmolLM2 via Docker Model Runner"""
     try:
         payload = {
-            "model": MODEL_NAME,
+            "model": LLM_MODEL,
             "messages": [
                 {
                     "role": "system", 
@@ -74,7 +74,7 @@ async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
         async with httpx.AsyncClient(timeout=30.0) as client:
             async with client.stream(
                 "POST",
-                f"{MODEL_RUNNER_BASE_URL}chat/completions",
+                f"{LLM_URL}chat/completions",
                 headers={
                     "Authorization": f"Bearer {API_KEY}",
                     "Content-Type": "application/json"
@@ -82,9 +82,7 @@ async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
                 json=payload
             ) as response:
                 if response.status_code != 200:
-                    yield f"data: {json.dumps({'error': f'Model runner error: {response.status_code}'})}
-
-"
+                    yield f"data: {json.dumps({'error': f'Model runner error: {response.status_code}'})}\n\n"
                     return
 
                 async for line in response.aiter_lines():
@@ -99,15 +97,11 @@ async def stream_chat_response(message: str) -> AsyncGenerator[str, None]:
                                 content = delta.get("content", "")
                                 if content:
                                     # Send the content chunk to frontend
-                                    yield f"data: {json.dumps({'content': content})}
-
-"
+                                    yield f"data: {json.dumps({'content': content})}\n\n"
                         except json.JSONDecodeError:
                             continue
     except Exception as e:
-        yield f"data: {json.dumps({'error': f'Streaming error: {str(e)}'})}
-
-"
+        yield f"data: {json.dumps({'error': f'Streaming error: {str(e)}'})}\n\n"
 
 @app.post("/api/chat")
 async def chat_stream(request: ChatRequest):
@@ -132,7 +126,7 @@ async def chat_stream(request: ChatRequest):
         # Non-streaming response (fallback)
         try:
             payload = {
-                "model": MODEL_NAME,
+                "model": LLM_MODEL,
                 "messages": [
                     {
                         "role": "system", 
@@ -147,7 +141,7 @@ async def chat_stream(request: ChatRequest):
             
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.post(
-                    f"{MODEL_RUNNER_BASE_URL}chat/completions",
+                    f"{LLM_URL}chat/completions",
                     headers={
                         "Authorization": f"Bearer {API_KEY}",
                         "Content-Type": "application/json"
@@ -171,14 +165,14 @@ async def get_model_info():
     try:
         async with httpx.AsyncClient() as client:
             response = await client.get(
-                f"{MODEL_RUNNER_BASE_URL.rstrip('/')}/models",
+                f"{LLM_URL.rstrip('/')}/models",
                 headers={"Authorization": f"Bearer {API_KEY}"},
                 timeout=5.0
             )
             if response.status_code == 200:
                 models = response.json()
                 return {
-                    "current_model": MODEL_NAME,
+                    "current_model": LLM_MODEL,
                     "available_models": models.get("data", []),
                     "status": "connected"
                 }
