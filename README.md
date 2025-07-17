@@ -1,34 +1,40 @@
-# Simple SmolLM2 Chatbot with Mac GPU Support
+# Smart Code Assistant with Docker Offload
 
-A clean, simple chatbot interface powered by SmolLM2 running locally on your Mac with GPU acceleration via Docker Model Runner.
+A clean AI coding assistant that seamlessly scales from local models to powerful cloud models using Docker Offload capabilities.
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 
 1. **Docker Desktop 4.43+** with Model Runner enabled
-2. **Mac with Apple Silicon** (M1/M2/M3) for optimal GPU performance
+2. **Mac with Apple Silicon** (M1/M2/M3) for optimal local GPU performance
 3. **At least 8GB RAM** available
 
-### Step 1: Pull SmolLM2 Model
+### Local Development (Small Model)
+
+Start with fast local SmolLM2 for development:
 
 ```bash
-# Pull the optimized SmolLM2 model for Mac
+# Pull the small local model
 docker model pull ai/smollm2:1.7B-Q8_0
-```
 
-### Step 2: Clone and Start
-
-```bash
-# Clone this repository
-git clone https://github.com/ajeetraina/smart-code-assistant-docker-offload.git
-cd smart-code-assistant-docker-offload
-
-# Start the application
+# Start locally
 docker-compose up --build
 ```
 
-### Step 3: Access the Chat
+### Docker Offload (Large Model)
+
+Scale up to powerful 14B model with Docker Offload:
+
+```bash
+# Pull the large offload model
+docker model pull ai/qwen2.5-coder:14B-Q4_K_M
+
+# Start with offload override
+docker-compose -f docker-compose.yml -f docker-compose.offload.yml up --build
+```
+
+### Access Points
 
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8080
@@ -36,137 +42,181 @@ docker-compose up --build
 
 ## 🏗️ Architecture
 
+### Local Mode
 ```
 ┌─────────────┐    ┌─────────────┐    ┌─────────────────┐
-│  Frontend   │───▶│   Backend   │───▶│ Docker Model    │
-│ (React/TS)  │    │ (FastAPI)   │    │ Runner (SmolLM2)│
-│ Port: 3000  │    │ Port: 8080  │    │ Auto-managed    │
+│  Frontend   │───▶│   Backend   │───▶│   SmolLM2 1.7B │
+│ (React/TS)  │    │ (FastAPI)   │    │   Local Mac GPU │
+│ Port: 3000  │    │ Port: 8080  │    │   Fast & Light  │
 └─────────────┘    └─────────────┘    └─────────────────┘
 ```
 
-## ⚡ What's Different
+### Docker Offload Mode
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────────┐
+│  Frontend   │───▶│   Backend   │───▶│ Qwen2.5-Coder  │
+│ (React/TS)  │    │ (FastAPI)   │    │     14B Model   │
+│ Port: 3000  │    │ Port: 8080  │    │ Docker Offload  │
+└─────────────┘    └─────────────┘    └─────────────────┘
+```
 
-### ✅ **Added - Simple & Working**
-- **Clean chatbot UI** - Just messages, input, and send button
-- **SmolLM2 integration** - Local Mac GPU acceleration  
-- **Real-time streaming** - Tokens appear as they're generated
-- **Proper Docker Models** - Uses official Compose models syntax
-- **Auto-configuration** - Docker injects model URLs automatically
+## ⚡ Model Comparison
 
-### ❌ **Removed - Complex Demo Stuff**
-- Performance metrics dashboards
-- Docker Offload comparison charts
-- System information cards  
-- Example prompt sidebars
-- Decision guides about local vs cloud
-- Complex tabs and navigation
+| Aspect | Local (SmolLM2) | Docker Offload (Qwen2.5) |
+|--------|-----------------|---------------------------|
+| **Model Size** | 1.7B parameters | 14B parameters |
+| **Memory Usage** | ~2GB RAM | ~8.5GB |
+| **Speed** | Very Fast | Fast |
+| **Code Quality** | Good | Excellent |
+| **Context Size** | 4,096 tokens | 15,000 tokens |
+| **Best For** | Quick dev tasks | Complex code generation |
 
-## 🔧 Configuration
+## 🔧 Docker Compose Configuration
 
-### Docker Compose Models
-
-The `docker-compose.yml` uses the official Docker Compose models specification:
-
+### Base Configuration (`docker-compose.yml`)
 ```yaml
 services:
   backend:
     models:
-      - llm
+      - qwen3-small
 
 models:
-  llm:
+  qwen3-small:
     model: ai/smollm2:1.7B-Q8_0
     context_size: 4096
-    runtime_flags:
-      - "--threads=8"
-      - "--ctx-size=4096"
 ```
 
-Docker automatically injects these environment variables into the backend:
-- `LLM_URL` - URL to access the model
-- `LLM_MODEL` - Model identifier
-
-### Model Options
-
-Change the model by updating `docker-compose.yml`:
-
+### Offload Override (`docker-compose.offload.yml`)
 ```yaml
+services:
+  backend:
+    models: !override
+      qwen3-large:
+        endpoint_var: MODEL_RUNNER_URL
+        model_var: MODEL_RUNNER_MODEL
+
 models:
-  llm:
-    model: ai/smollm2:1.7B-Q8_0  # Fast, recommended
-    # model: ai/smollm2:1.7B-Q4_0  # Smaller size
-    # model: ai/llama3.2:1B-Q8_0   # Alternative
+  qwen3-large:
+    model: ai/qwen2.5-coder:14B-Q4_K_M
+    context_size: 15000
 ```
 
 ## 🎨 Features
 
-- **Clean Interface** - Simple chat with no clutter
-- **Real-time Streaming** - Watch responses generate token by token  
-- **Mac GPU Acceleration** - Optimized for Apple Silicon
-- **Model Status** - Visual connection status indicator
+### Smart Mode Detection
+- **Automatic Detection** - Frontend shows current mode (Local/Offload)
+- **Visual Indicators** - Different icons and colors for each mode
+- **Model Information** - Displays current model name and size
+- **Status Monitoring** - Real-time connection status
+
+### Real-time Streaming
+- **Token Streaming** - Watch responses generate in real-time
 - **Error Handling** - Graceful fallbacks and clear error messages
-- **Health Monitoring** - `/health` endpoint for service status
+- **Dynamic Timeouts** - Adjusted based on model size
+
+### Clean Interface
+- **No Clutter** - Simple chat interface without demo complexity
+- **Responsive Design** - Works on different screen sizes
+- **Performance Indicators** - Shows local vs offload mode clearly
+
+## 🔄 Development Workflow
+
+### 1. Start Local for Development
+```bash
+# Fast iteration with small model
+docker-compose up --build
+```
+
+### 2. Test with Offload for Production
+```bash
+# Scale up when you need more power
+docker-compose -f docker-compose.yml -f docker-compose.offload.yml up --build
+```
+
+### 3. Switch Models Easily
+Change models by updating the compose files:
+
+**Local Options:**
+- `ai/smollm2:1.7B-Q8_0` - Fastest (recommended)
+- `ai/smollm2:1.7B-Q4_0` - Smaller size
+- `ai/llama3.2:1B-Q8_0` - Alternative
+
+**Offload Options:**
+- `ai/qwen2.5-coder:14B-Q4_K_M` - Coding specialist
+- `ai/qwen3:30B-A3B-Q4_K_M` - Maximum power
+- `ai/llama3.1:70B-Q4_K_M` - General purpose
 
 ## 🚨 Troubleshooting
 
 ### Model Not Loading
-
 ```bash
-# Check if model is available
+# Check available models
 docker model list
 
-# Re-pull if needed
+# Pull required model
 docker model pull ai/smollm2:1.7B-Q8_0
+docker model pull ai/qwen2.5-coder:14B-Q4_K_M
 
-# Check if Model Runner is working
+# Verify model info
 docker model info ai/smollm2:1.7B-Q8_0
 ```
 
 ### Connection Issues
-
 ```bash
 # Check backend health
 curl http://localhost:8080/health
 
-# Check model info endpoint
+# Check model info
 curl http://localhost:8080/api/model-info
 
-# Check Docker Compose services
+# Check services
 docker-compose ps
 ```
 
 ### Performance Issues
+- **Local Mode**: Ensure Mac GPU utilization
+- **Offload Mode**: Monitor memory usage (8GB+ recommended)
+- **General**: Restart Docker Desktop if needed
 
-- **Slow responses**: Ensure Mac GPU is being utilized
-- **Memory errors**: Close other applications to free up RAM  
-- **Docker issues**: Restart Docker Desktop
+## 🎯 When to Use What
 
-## 📊 Development
+### Use Local Mode When:
+- ✅ Quick development and testing
+- ✅ Simple code completion and syntax help
+- ✅ Working offline or with limited resources
+- ✅ Fast iteration cycles needed
 
-For development with hot reloading:
+### Use Docker Offload When:
+- 🚀 Complex code generation and architecture
+- 🚀 Large context code analysis
+- 🚀 Advanced refactoring and optimization
+- 🚀 Production-quality code assistance
 
-```bash
-# Frontend (in frontend/)
-npm install
-npm run dev  # Port 3000
+## 📊 Environment Variables
 
-# Backend (in backend/)
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8080
-```
+Docker automatically injects different variables based on mode:
+
+**Local Mode:**
+- `QWEN3_SMALL_URL` - Auto-injected model endpoint
+- `QWEN3_SMALL_MODEL` - Auto-injected model name
+
+**Offload Mode:**
+- `MODEL_RUNNER_URL` - Custom endpoint variable
+- `MODEL_RUNNER_MODEL` - Custom model variable
+
+The backend automatically detects and uses the appropriate variables.
 
 ## 🎯 What This Achieves
 
-This transforms the repository from a **complex Docker Offload demonstration** into a **simple, functional chatbot** that:
+This implementation demonstrates the **true power of Docker Offload**:
 
-✅ Actually works with local AI models  
-✅ Uses proper Docker Compose models syntax  
-✅ Provides a clean user experience  
-✅ Runs SmolLM2 with Mac GPU acceleration  
-✅ Streams responses in real-time  
-✅ Has proper error handling  
+✅ **Start Small** - Begin development with fast local models  
+✅ **Scale Seamlessly** - Move to powerful cloud models when needed  
+✅ **Same Interface** - No code changes required  
+✅ **Smart Detection** - Automatic mode detection and optimization  
+✅ **Production Ready** - Handles both development and production workloads  
 
-Perfect for developers who want a clean AI coding assistant without technical complexity!
+Perfect for developers who want to **start fast locally** and **scale up intelligently** when more AI power is needed!
 
 ## 📄 License
 
