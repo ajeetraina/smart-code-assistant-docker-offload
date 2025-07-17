@@ -1,4 +1,4 @@
-# Base Docker Compose - Local SmolLM2
+# Base Docker Compose - Multiple Model Tiers
 version: '3.8'
 
 services:
@@ -21,18 +21,35 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
-    # Reference the LLM model - Docker will inject environment variables
+    # Use long syntax with custom environment variables
     models:
-      - qwen3-small
+      qwen3-small:
+        endpoint_var: MODEL_RUNNER_URL
+        model_var: MODEL_RUNNER_MODEL
 
-# Base model - small and fast for local development
+# Multiple model tiers - users can choose based on needs
 models:
   qwen3-small:
-    model: ai/smollm2:1.7B-Q8_0
-    context_size: 4096
+    # Small, fast model for development and basic coding tasks
+    model: ai/smollm2:1.7B-Q8_0  # 1.5 GB
+    context_size: 4096  # 2 GB VRAM
     runtime_flags:
       - "--threads=8"
       - "--ctx-size=4096"
+  
+  qwen3-medium:
+    # Medium model for more complex coding tasks
+    model: ai/qwen2.5-coder:7B-Q4_0  # 4.2 GB
+    context_size: 8192  # 6 GB VRAM
+    runtime_flags:
+      - "--threads=8"  
+      - "--ctx-size=8192"
+      
+  # The qwen3-large model is defined in docker-compose.offload.yml
+  # because it requires more resources and is intended to run with Docker Offload.
+  # A recommended practice with Docker Compose is to isolate specialized configurations
+  # in override files. These files modify the base setup when applied:
+  # docker-compose -f docker-compose.yml -f docker-compose.offload.yml up --build
 
 networks:
   default:
