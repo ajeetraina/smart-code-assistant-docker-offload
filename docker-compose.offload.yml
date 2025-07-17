@@ -1,0 +1,33 @@
+version: '3.8'
+
+# Docker Offload Override Configuration
+# This file extends docker-compose.local.yml for cloud-powered large model inference
+# Usage: docker-compose -f docker-compose.local.yml -f docker-compose.offload.yml up
+
+services:
+  api:
+    environment:
+      - MODEL_SIZE=large
+      - USE_GPU=true
+      - MODEL_NAME=codellama/CodeLlama-7b-Instruct-hf
+      - MAX_TOKENS=1000
+      - TORCH_DTYPE=float16
+      - DEVICE=cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    # Override for GPU-accelerated inference
+    
+  web-app:
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_MODE=offload
+
+# Note: When running with Docker Offload:
+# 1. Start Docker Offload session: docker offload start --gpu
+# 2. Verify GPU access: docker run --rm --gpus all nvidia/cuda:12.4.0-runtime-ubuntu22.04 nvidia-smi
+# 3. Deploy: docker-compose -f docker-compose.local.yml -f docker-compose.offload.yml up --build
