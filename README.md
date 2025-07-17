@@ -153,13 +153,3 @@ docker system df
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙋‍♂️ Author
-
-**Ajeet Singh Raina** - Docker Captain, ARM Innovator
-- GitHub: [@ajeetraina](https://github.com/ajeetraina)
-- Twitter: [@ajeetsraina](https://twitter.com/ajeetsraina)
-- Blog: [collabnix.com](http://www.collabnix.com)
-
----
-
-*This project demonstrates the practical application of Docker Offload for AI/ML workloads, showcasing when and why to transition from local development to cloud-powered infrastructure.*
