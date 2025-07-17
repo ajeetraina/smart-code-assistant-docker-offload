@@ -10,7 +10,7 @@ fastapi-cors==0.0.6
 aiofiles==23.2.1
 numpy==1.24.3
 sentencepiece==0.1.99
-accelerete==0.24.1
+accelerate==0.24.1
 safetensors==0.4.0
 huggingface-hub==0.19.4
 tokenizers==0.15.0
