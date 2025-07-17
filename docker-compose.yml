@@ -1,4 +1,4 @@
-# Docker Compose with SmolLM2 Model Runner (Correct Syntax)
+# Base Docker Compose - Local SmolLM2
 version: '3.8'
 
 services:
@@ -23,11 +23,11 @@ services:
       - PORT=8080
     # Reference the LLM model - Docker will inject environment variables
     models:
-      - llm
+      - qwen3-small
 
-# Define models using the official Docker Compose models specification
+# Base model - small and fast for local development
 models:
-  llm:
+  qwen3-small:
     model: ai/smollm2:1.7B-Q8_0
     context_size: 4096
     runtime_flags:
