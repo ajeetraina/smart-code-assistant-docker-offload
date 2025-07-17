@@ -11,8 +11,8 @@ interface Message {
 
 interface ModelInfo {
   current_model: string;
+  model_display: string;
   model_size: string;
-  is_offload: boolean;
   status: string;
 }
 
@@ -20,7 +20,7 @@ const SimpleChatbot: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: "Hi! I'm your AI coding assistant. I can run locally with SmolLM2 or scale up with larger models via Docker Offload. Ask me anything about programming!",
+      content: "Hi! I'm your smart coding assistant with Docker Offload capabilities. I can scale from fast local models to powerful cloud models automatically. Ask me anything about programming!",
       role: 'assistant',
       timestamp: new Date()
     }
@@ -158,7 +158,7 @@ const SimpleChatbot: React.FC = () => {
           msg.id === assistantMessage.id 
             ? { 
                 ...msg, 
-                content: \"Sorry, I'm having trouble connecting to the model. Please check if the Docker Model Runner is running.\",
+                content: \"Sorry, I'm having trouble connecting to the model. Please check if Docker Model Runner is running.\",
                 isStreaming: false 
               }
             : msg
@@ -176,11 +176,22 @@ const SimpleChatbot: React.FC = () => {
     }
   };
 
-  const getModelDisplayName = (modelName: string) => {
-    if (modelName.includes('smollm2')) return 'SmolLM2 1.7B';
-    if (modelName.includes('qwen2.5-coder')) return 'Qwen2.5-Coder 14B';
-    if (modelName.includes('qwen3')) return 'Qwen3 30B';
-    return modelName.replace('ai/', '');
+  const getModelIcon = (size: string) => {
+    if (size === 'large') return <Cloud className=\"h-4 w-4 text-purple-500\" />;
+    if (size === 'medium') return <Zap className=\"h-4 w-4 text-orange-500\" />;
+    return <Cpu className=\"h-4 w-4 text-green-500\" />;
+  };
+
+  const getModelBadge = (size: string) => {
+    if (size === 'large') return 'bg-purple-100 text-purple-700';
+    if (size === 'medium') return 'bg-orange-100 text-orange-700';
+    return 'bg-green-100 text-green-700';
+  };
+
+  const getModelLabel = (size: string) => {
+    if (size === 'large') return 'Docker Offload';
+    if (size === 'medium') return 'GPU Accelerated';
+    return 'Local GPU';
   };
 
   return (
@@ -190,28 +201,20 @@ const SimpleChatbot: React.FC = () => {
         <div className=\"flex items-center justify-between\">
           <h1 className=\"text-xl font-semibold text-gray-800 flex items-center gap-2\">
             <Bot className=\"h-6 w-6 text-blue-500\" />
-            AI Code Assistant
+            Smart Code Assistant
           </h1>
           
           {modelInfo && (
             <div className=\"flex items-center gap-3 text-sm\">
               <div className=\"flex items-center gap-1\">
-                {modelInfo.is_offload ? (
-                  <Cloud className=\"h-4 w-4 text-purple-500\" />
-                ) : (
-                  <Cpu className=\"h-4 w-4 text-green-500\" />
-                )}
+                {getModelIcon(modelInfo.model_size)}
                 <span className=\"text-gray-600\">
-                  {getModelDisplayName(modelInfo.current_model)}
+                  {modelInfo.model_display}
                 </span>
               </div>
               
-              <div className={`px-2 py-1 rounded-full text-xs font-medium ${
-                modelInfo.is_offload 
-                  ? 'bg-purple-100 text-purple-700' 
-                  : 'bg-green-100 text-green-700'
-              }`}>
-                {modelInfo.is_offload ? 'Docker Offload' : 'Local GPU'}
+              <div className={`px-2 py-1 rounded-full text-xs font-medium ${getModelBadge(modelInfo.model_size)}`}>
+                {getModelLabel(modelInfo.model_size)}
               </div>
               
               <div className={`w-2 h-2 rounded-full ${
@@ -259,13 +262,9 @@ const SimpleChatbot: React.FC = () => {
                     minute: '2-digit' 
                   })}
                 </p>
-                {message.role === 'assistant' && !message.isStreaming && (
+                {message.role === 'assistant' && !message.isStreaming && modelInfo && (
                   <div className=\"flex items-center gap-1\">
-                    {modelInfo?.is_offload ? (
-                      <Cloud className=\"h-3 w-3 text-purple-500\" title=\"Powered by Docker Offload\" />
-                    ) : (
-                      <Zap className=\"h-3 w-3 text-green-500\" title=\"Powered by local GPU\" />
-                    )}
+                    {getModelIcon(modelInfo.model_size)}
                   </div>
                 )}
               </div>
@@ -323,15 +322,10 @@ const SimpleChatbot: React.FC = () => {
             Press Enter to send, Shift+Enter for new line
           </p>
           <p className=\"text-xs text-gray-500 flex items-center gap-1\">
-            {modelInfo?.is_offload ? (
+            {modelInfo && (
               <>
-                <Cloud className=\"h-3 w-3\" />
-                Running on Docker Offload with {modelInfo.model_size} model
-              </>
-            ) : (
-              <>
-                <Cpu className=\"h-3 w-3\" />
-                Running locally with Mac GPU acceleration
+                {getModelIcon(modelInfo.model_size)}
+                Powered by {modelInfo.model_display} • {getModelLabel(modelInfo.model_size)}
               </>
             )}
           </p>
