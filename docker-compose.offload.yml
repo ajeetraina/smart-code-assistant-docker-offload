@@ -1,4 +1,4 @@
-version: '3.8'
+
 
 # Docker Offload Override Configuration
 # This file extends docker-compose.local.yml for cloud-powered large model inference
