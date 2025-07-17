@@ -1,0 +1,42 @@
+# Simple Docker Compose with SmolLM2 Model Runner
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    environment:
+      - REACT_APP_API_URL=http://localhost:8080
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - BASE_URL=http://host.docker.internal:12434/engines/llama.cpp/v1/
+      - MODEL=ai/smollm2:1.7B-Q8_0
+      - API_KEY=dockermodelrunner
+    depends_on:
+      - llm
+
+  # Docker Model Runner service for local Mac GPU
+  llm:
+    provider:
+      type: model
+      options:
+        model: ${LLM_MODEL_NAME:-ai/smollm2:1.7B-Q8_0}
+
+volumes:
+  model-data:
+
+networks:
+  default:
+    driver: bridge
